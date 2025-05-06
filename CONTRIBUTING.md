@@ -53,4 +53,4 @@ We’ll review your PR as soon as we can! If there’s feedback, we’ll let you
 - **Tests**: If you add a feature, test it in a Proxmox environment and share the results in your PR.
 
 ## 📬 Need Help?
-Got questions? Feel free to open an [issue](https://github.com/chrodrigues/terraform-proxmox-k8s/issues) with your question, or ping me on [X](https://x.com/your-handle). Let’s build something awesome together! 💪
+Got questions? Feel free to open an [issue](https://github.com/chrodrigues/terraform-proxmox-k8s/issues) with your question, or ping me. Let’s build something awesome together! 💪
