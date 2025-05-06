@@ -28,6 +28,7 @@ cd terraform-proxmox-k8s
 
 2. Set Up Your Variables
 You’ll need to configure variables for Proxmox and the K8s cluster. Create a file called secret.auto.tfvars (it’s gitignored, so your secrets are safe). Here’s an example:
+
 # Proxmox connection
 proxmox_endpoint = "https://192.168.1.100:8006/api2/json"
 proxmox_user_name = "root@pam"
