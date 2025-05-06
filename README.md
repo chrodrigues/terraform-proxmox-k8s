@@ -79,16 +79,16 @@ No extra config needed unless you want to tweak the zones (see [modules/bind9_dn
 
 4. Deploy the Cluster
 Time to fire it up! Run these commands:
-terraform init
-terraform plan  # Check what’s gonna happen
-terraform apply --auto-approve
+$ terraform init
+$ terraform plan  # Check what’s gonna happen
+$ terraform apply --auto-approve
 
 This will:
 
-Spin up a DNS VM (if enabled) at 192.168.100.3.
-Create control plane VMs (e.g., k8s-control-plane-0 at 192.168.100.50) and worker nodes (e.g., k8s-worker-0 at 192.168.100.60).
-Configure each VM with cloud-init to install containerd, kubeadm, and Calico CNI.
-Bootstrap the K8s cluster using kubeadm, with the first control plane node running a temporary HTTP server (port 8000) to share the join token.
+- Spin up a DNS VM (if enabled) at 192.168.100.3.
+- Create control plane VMs (e.g., k8s-control-plane-0 at 192.168.100.50) and worker nodes (e.g., k8s-worker-0 at 192.168.100.60).
+- Configure each VM with cloud-init to install containerd, kubeadm, and Calico CNI.
+- Bootstrap the K8s cluster using kubeadm, with the first control plane node running a temporary HTTP server (port 8000) to share the join token.
 
 5. Access Your Cluster
 Once terraform apply finishes (takes ~7-12 minutes), SSH into the first control plane node (k8s-control-plane-0):
