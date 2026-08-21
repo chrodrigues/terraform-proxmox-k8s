@@ -1,0 +1,12 @@
+options {
+    directory "/var/cache/bind";
+    allow-query { any; };
+    recursion yes;
+    forwarders {
+{% for ns in upstream_dns_servers %}
+        {{ ns }};
+{% endfor %}
+    };
+    dnssec-validation auto;
+    listen-on-v6 { any; };
+};

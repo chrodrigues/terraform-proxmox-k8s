@@ -1,0 +1,5 @@
+---
+# The DNS server resolves against itself
+resolv_nameservers:
+  - 127.0.0.1
+  - "{{ upstream_dns_servers[0] }}"

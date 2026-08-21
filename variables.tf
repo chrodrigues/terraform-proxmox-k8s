@@ -4,49 +4,25 @@ variable "proxmox_endpoint" {
 }
 
 variable "proxmox_user_name" {
-  description = "Proxmox api token id"
+  description = "Proxmox username (e.g. root@pam)"
   type        = string
 }
 
 variable "proxmox_user_password" {
-  description = "Proxmox api token secret"
+  description = "Proxmox user password"
   type        = string
   sensitive   = true
+}
+
+variable "proxmox_insecure" {
+  description = "Skip TLS verification for the Proxmox API (self-signed certs)"
+  type        = bool
+  default     = true
 }
 
 variable "proxmox_vm_user" {
-  description = "Linux username"
+  description = "Linux username created on every VM (also used by Ansible over SSH)"
   type        = string
-}
-
-variable "proxmox_vm_password" {
-  description = "Linux user password"
-  type        = string
-  sensitive   = true
-}
-
-variable "proxmox_number_of_vm_k8s_worker_node" {
-  description = "Number of k8s worker nodes"
-  type        = string
-  default     = "3"
-}
-
-variable "proxmox_number_of_vm_k8s_control_plane" {
-  description = "Number of k8s control plane nodes"
-  type        = string
-  default     = "1"
-}
-
-variable "k8s_control_plane_ip_start" {
-  description = "First IP of the k8s control plane address range"
-  type        = string
-  default     = "50"
-}
-
-variable "k8s_worker_ip_start" {
-  description = "First IP of the k8s worker address range"
-  type        = string
-  default     = "60"
 }
 
 variable "proxmox_node_name" {
@@ -56,48 +32,91 @@ variable "proxmox_node_name" {
 }
 
 variable "proxmox_datastore_name" {
-  description = "Proxmox datastore"
-  type = string
-  default = "local"
-}
-variable "prometheus_metrics_server_replicas" {
+  description = "Proxmox datastore for snippets and the cloud image (must support 'snippets' and 'iso' content)"
   type        = string
-  description = "Number of prometheus metrics server replicas"
+  default     = "local"
+}
+
+variable "proxmox_vm_datastore_name" {
+  description = "Proxmox datastore for the VM disks (must support 'images' content)"
+  type        = string
+  default     = "local-lvm"
+}
+
+variable "ssh_public_key_file" {
+  description = "Path to the SSH public key injected into the VMs"
+  type        = string
+  default     = "./id_rsa.pub"
+}
+
+variable "ssh_private_key_file" {
+  description = "Path to the matching SSH private key (used by Ansible)"
+  type        = string
+  default     = "./id_rsa"
+}
+
+variable "proxmox_number_of_vm_k8s_worker_node" {
+  description = "Number of k8s worker nodes"
+  type        = number
+  default     = 3
+}
+
+variable "proxmox_number_of_vm_k8s_control_plane" {
+  description = "Number of k8s control plane nodes"
+  type        = number
   default     = 1
 }
 
-variable "prometheus_retention" {
+variable "proxmox_vm_name_k8s_control_plane" {
+  description = "Name prefix for the k8s control plane VMs"
   type        = string
-  description = "Retention in days for prometheus"
-  default     = "7"
+  default     = "k8s-control-plane-"
 }
 
-variable "prometheus_storageclass_name" {
+variable "proxmox_vm_name_k8s_worker_node" {
+  description = "Name prefix for the k8s worker VMs"
   type        = string
-  description = "Storage class name"
-  default     = "openebs"
+  default     = "k8s-worker-"
 }
 
-variable "prometheus_disk_size" {
+variable "network_prefix" {
+  description = "First three octets of the VM network (without trailing dot)"
   type        = string
-  description = "Disk size for prometheus"
+  default     = "192.168.100"
+}
+
+variable "network_gateway" {
+  description = "Default gateway for all VMs"
+  type        = string
+  default     = "192.168.100.1"
+}
+
+variable "dns_server_ip" {
+  description = "IP address of the BIND9 DNS server VM"
+  type        = string
+  default     = "192.168.100.3"
+}
+
+variable "k8s_control_plane_ip_start" {
+  description = "Last octet of the first control plane IP (e.g. 50 -> 192.168.100.50)"
+  type        = number
   default     = 50
 }
 
-
-variable "grafana_password_admin" {
-  type        = string
-  description = "Password for admin user"
+variable "k8s_worker_ip_start" {
+  description = "Last octet of the first worker IP (e.g. 60 -> 192.168.100.60)"
+  type        = number
+  default     = 60
 }
 
-variable "grafana_disk_size" {
+variable "domain" {
+  description = "Local DNS domain for the cluster"
   type        = string
-  description = "Disk size for grafana"
-  default     = 10
+  default     = "homelab.local"
 }
 
-variable "grafana_storageclass_name" {
+variable "timezone" {
+  description = "Timezone configured on all VMs"
   type        = string
-  description = "Storage class name"
-  default     = "openebs"
+  default     = "America/Toronto"
 }

@@ -1,0 +1,5 @@
+---
+# Kubernetes nodes resolve against the BIND9 VM first
+resolv_nameservers:
+  - "{{ dns_server_ip }}"
+  - "{{ upstream_dns_servers[0] }}"

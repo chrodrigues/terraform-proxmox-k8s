@@ -1,0 +1,122 @@
+---
+- name: Check if this node already joined the cluster
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: control_plane_kubelet_conf
+
+# --- First control plane node: kubeadm init + Calico ---
+- name: Bootstrap the first control plane node
+  when: inventory_hostname == groups['control_plane'][0]
+  block:
+    - name: Template kubeadm config
+      ansible.builtin.template:
+        src: kubeadm-config.yaml.j2
+        dest: /root/kubeadm-config.yaml
+        mode: "0600"
+
+    - name: Initialize the cluster (kubeadm init)
+      ansible.builtin.command: >
+        kubeadm init --config /root/kubeadm-config.yaml --upload-certs
+      args:
+        creates: /etc/kubernetes/admin.conf
+
+    - name: Create .kube directory for {{ vm_user }}
+      ansible.builtin.file:
+        path: "/home/{{ vm_user }}/.kube"
+        state: directory
+        owner: "{{ vm_user }}"
+        group: "{{ vm_user }}"
+        mode: "0755"
+
+    - name: Copy kubeconfig for {{ vm_user }}
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "/home/{{ vm_user }}/.kube/config"
+        remote_src: true
+        owner: "{{ vm_user }}"
+        group: "{{ vm_user }}"
+        mode: "0600"
+
+    - name: Wait for the API server to be ready
+      ansible.builtin.command: kubectl get nodes
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: control_plane_api_ready
+      until: control_plane_api_ready.rc == 0
+      retries: 20
+      delay: 15
+      changed_when: false
+
+    - name: Install Calico operator
+      ansible.builtin.command: >
+        kubectl apply --server-side -f
+        https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/tigera-operator.yaml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: control_plane_tigera_apply
+      until: control_plane_tigera_apply.rc == 0
+      retries: 5
+      delay: 15
+      changed_when: "'created' in control_plane_tigera_apply.stdout"
+
+    - name: Template Calico custom resources
+      ansible.builtin.template:
+        src: calico-custom-resources.yaml.j2
+        dest: /root/calico-custom-resources.yaml
+        mode: "0600"
+
+    # --force-conflicts: after the first run the tigera operator becomes the
+    # field manager of spec.calicoNetwork, so re-applies would conflict.
+    - name: Apply Calico custom resources
+      ansible.builtin.command: >
+        kubectl apply --server-side --force-conflicts -f /root/calico-custom-resources.yaml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: control_plane_calico_apply
+      until: control_plane_calico_apply.rc == 0
+      retries: 10
+      delay: 15
+      changed_when: "'created' in control_plane_calico_apply.stdout"
+
+    - name: Wait for this node to be Ready
+      ansible.builtin.command: >
+        kubectl wait --for=condition=Ready node/{{ inventory_hostname }} --timeout=600s
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      changed_when: false
+
+    # Local copy for pipelines (kubectl/helm steps) - gitignored
+    - name: Fetch kubeconfig to the Ansible controller
+      ansible.builtin.fetch:
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ playbook_dir }}/artifacts/kubeconfig"
+        flat: true
+
+# --- Additional control plane nodes: kubeadm join ---
+- name: Join additional control plane node
+  when:
+    - inventory_hostname != groups['control_plane'][0]
+    - not control_plane_kubelet_conf.stat.exists
+  block:
+    - name: Generate join command on the first control plane
+      ansible.builtin.command: kubeadm token create --print-join-command
+      delegate_to: "{{ groups['control_plane'][0] }}"
+      register: control_plane_join_command
+      changed_when: false
+
+    - name: Upload certificates and get the certificate key
+      ansible.builtin.shell: >
+        set -o pipefail;
+        kubeadm init phase upload-certs --upload-certs | tail -1
+      args:
+        executable: /bin/bash
+      delegate_to: "{{ groups['control_plane'][0] }}"
+      register: control_plane_certificate_key
+      changed_when: false
+
+    - name: Join the cluster as control plane
+      ansible.builtin.command: >
+        {{ control_plane_join_command.stdout }}
+        --control-plane --certificate-key {{ control_plane_certificate_key.stdout }}
+      args:
+        creates: /etc/kubernetes/kubelet.conf

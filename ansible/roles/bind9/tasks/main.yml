@@ -1,0 +1,74 @@
+---
+- name: Install BIND9
+  ansible.builtin.apt:
+    name:
+      - bind9
+      - bind9utils
+    state: present
+    update_cache: true
+
+- name: Configure named.conf.options
+  ansible.builtin.template:
+    src: named.conf.options.j2
+    dest: /etc/bind/named.conf.options
+    owner: bind
+    group: bind
+    mode: "0644"
+  notify: Restart named
+
+- name: Configure named.conf.local
+  ansible.builtin.template:
+    src: named.conf.local.j2
+    dest: /etc/bind/named.conf.local
+    owner: bind
+    group: bind
+    mode: "0644"
+  notify: Restart named
+
+- name: Configure forward zone
+  ansible.builtin.template:
+    src: db.forward.j2
+    dest: "/etc/bind/db.{{ domain }}"
+    owner: bind
+    group: bind
+    mode: "0644"
+  notify: Restart named
+
+- name: Configure reverse zone
+  ansible.builtin.template:
+    src: db.reverse.j2
+    dest: "/etc/bind/db.{{ network_prefix }}"
+    owner: bind
+    group: bind
+    mode: "0644"
+  notify: Restart named
+
+- name: Validate BIND configuration
+  ansible.builtin.command: named-checkconf
+  changed_when: false
+
+- name: Validate forward zone
+  ansible.builtin.command: "named-checkzone {{ domain }} /etc/bind/db.{{ domain }}"
+  changed_when: false
+
+- name: Validate reverse zone
+  ansible.builtin.command: >
+    named-checkzone {{ bind9_reverse_zone }} /etc/bind/db.{{ network_prefix }}
+  changed_when: false
+
+- name: Enable and start named
+  ansible.builtin.systemd:
+    name: named
+    enabled: true
+    state: started
+
+- name: Flush handlers so named picks up config changes now
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify DNS resolution
+  ansible.builtin.command: "nslookup ns1.{{ domain }} 127.0.0.1"
+  changed_when: false
+  retries: 5
+  delay: 5
+  register: bind9_dns_check
+  until: bind9_dns_check.rc == 0
