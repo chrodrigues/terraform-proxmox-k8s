@@ -1,0 +1,3 @@
+---
+# 192.168.100 -> 100.168.192.in-addr.arpa
+bind9_reverse_zone: "{{ network_prefix.split('.') | reverse | join('.') }}.in-addr.arpa"

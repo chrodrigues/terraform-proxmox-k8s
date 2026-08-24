@@ -1,0 +1,14 @@
+---
+# Kubernetes versions (apt repo channel, pinned package and full semver)
+kubernetes_repo_channel: "v1.30"
+kubernetes_package_version: "1.30.0-1.1"
+kubernetes_version: "v1.30.0"
+
+containerd_package_version: "1.7.27-1"
+calico_version: "v3.29.1"
+pod_subnet: "10.45.0.0/16"
+
+# Upstream DNS servers used as BIND9 forwarders and resolv.conf fallback
+upstream_dns_servers:
+  - 8.8.8.8
+  - 8.8.4.4

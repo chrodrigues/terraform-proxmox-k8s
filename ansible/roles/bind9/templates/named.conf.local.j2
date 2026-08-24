@@ -1,0 +1,10 @@
+zone "{{ domain }}" IN {
+    type master;
+    file "/etc/bind/db.{{ domain }}";
+    allow-update { none; };
+};
+zone "{{ bind9_reverse_zone }}" IN {
+    type master;
+    file "/etc/bind/db.{{ network_prefix }}";
+    allow-update { none; };
+};

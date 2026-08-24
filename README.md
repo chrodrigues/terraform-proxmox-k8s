@@ -1,13 +1,16 @@
 # Terraform Proxmox Kubernetes
 
-This project automates the deployment of a Kubernetes cluster on Proxmox using Terraform. Ideal for homelabs, development, or testing environments.
+This project automates the deployment of a Kubernetes cluster on Proxmox using **Terraform** (infrastructure) and **Ansible** (cluster bootstrap). Ideal for homelabs, development, or testing environments.
+
+**Why the split?** Terraform is great at creating VMs, but terrible at knowing whether a 10-minute bootstrap script inside cloud-init actually worked. Ansible is idempotent: if something fails halfway, just run the playbook again and it picks up where it left off — no need to destroy and recreate VMs.
 
 ## 🛠️ Tech Stack
 
-- **Terraform**: Infra as code, provisioning VMs on Proxmox.
+- **Terraform**: Provisions the VMs on Proxmox and generates the Ansible inventory.
+- **Ansible**: Installs and bootstraps the cluster (DNS, containerd, kubeadm, Calico).
 - **Proxmox VE**: Hypervisor for running our VMs.
 - **Kubernetes (v1.30)**: Kubeadm for cluster setup, Calico for networking.
-- **BIND9**: Optional DNS server for `homelab.local` resolution.
+- **BIND9**: DNS server for `homelab.local` resolution (forward + reverse zones with a record for every node).
 - **Ubuntu 22.04**: Base image for all VMs.
 - **containerd**: Container runtime for K8s.
 
@@ -17,16 +20,16 @@ Before you kick things off, make sure you’ve got:
 
 - Proxmox VE 7.0+ up and running.
 - Terraform 1.3+ installed locally.
-- SSH key pair (put your public key in `[id_rsa.pub](id_rsa.pub)`).
-- Proxmox API access with a user and password (or token, but we’re using password here).
+- Ansible 2.14+ installed locally (`pipx install ansible` or your package manager).
+- SSH key pair: point `ssh_public_key_file` / `ssh_private_key_file` at your keys (e.g. `~/.ssh/id_rsa.pub`), or drop them in the repo root as `id_rsa.pub` / `id_rsa` (the private key is gitignored).
+- The snippets datastore needs the `snippets` content type enabled (Proxmox UI: Datacenter → Storage → local → Content).
+- Proxmox API access with a user and password.
 - A network bridge (`vmbr0`) configured in Proxmox.
 - Enough resources for VMs (e.g., 1 DNS VM, 1+ control plane, 3+ worker nodes).
 
 ## 🚀 Getting Started
 
 ### 1. Clone the Repo
-
-Grab the code and hop into the directory:
 
 ```bash
 git clone https://github.com/chrodrigues/terraform-proxmox-k8s
@@ -35,165 +38,136 @@ cd terraform-proxmox-k8s
 
 ### 2. Set Up Your Variables
 
-You’ll need to configure variables for Proxmox and the K8s cluster. Create a file called `secret.auto.tfvars` (it’s gitignored, so your secrets are safe). Here’s an example:
+Create a file called `secret.auto.tfvars` (it’s gitignored, so your secrets are safe). Here’s an example:
 
 ```hcl
 # Proxmox connection
-proxmox_endpoint = "https://192.168.1.100:8006/api2/json"
-proxmox_user_name = "root@pam"
+proxmox_endpoint      = "https://192.168.1.100:8006/api2/json"
+proxmox_user_name     = "root@pam"
 proxmox_user_password = "your-super-secret-password"
 
-# VM user
-proxmox_vm_user = "Ubuntu"
-proxmox_vm_password = "your-vm-password"
+# VM user (also used by Ansible over SSH)
+proxmox_vm_user = "ubuntu"
+
+# SSH keys (defaults: ./id_rsa.pub and ./id_rsa in the repo root)
+ssh_public_key_file  = "~/.ssh/id_rsa.pub"
+ssh_private_key_file = "~/.ssh/id_rsa"
 
 # Cluster config
-proxmox_node_name = "proxmox"
-proxmox_datastore_name = "local"
-proxmox_number_of_vm_k8s_control_plane = "1"
-proxmox_number_of_vm_k8s_worker_node = "3"
-k8s_control_plane_ip_start = "50"  # First control plane IP: 192.168.100.50
-k8s_worker_ip_start = "60"        # First worker IP: 192.168.100.60
+proxmox_node_name                      = "proxmox"
+proxmox_datastore_name                 = "local"     # snippets + cloud image (enable 'snippets' content on it)
+proxmox_vm_datastore_name              = "local-lvm" # VM disks
+proxmox_number_of_vm_k8s_control_plane = 1
+proxmox_number_of_vm_k8s_worker_node   = 3
+
+# Network (defaults shown - change to match your LAN)
+network_prefix             = "192.168.100"
+network_gateway            = "192.168.100.1"
+dns_server_ip              = "192.168.100.3"
+k8s_control_plane_ip_start = 50 # first control plane IP: 192.168.100.50
+k8s_worker_ip_start        = 60 # first worker IP: 192.168.100.60
 ```
 
-Check out all variables in `[variables.tf](variables.tf)` for defaults and descriptions. Key ones to set:
+Check out all variables in [variables.tf](variables.tf) for defaults and descriptions (domain, timezone, VM sizing, etc.).
 
-- `proxmox_endpoint`: Your Proxmox API URL (e.g., `https://<proxmox-ip>:8006/api2/json`).
-- `proxmox_user_name` and `proxmox_user_password`: API credentials.
-- `proxmox_vm_user` and `proxmox_vm_password`: User for SSH into VMs.
-- `k8s_control_plane_ip_start` and `k8s_worker_ip_start`: Starting IPs for control plane and worker nodes (e.g., `50` for `192.168.100.50`).
-- `proxmox_number_of_vm_k8s_control_plane` and `proxmox_number_of_vm_k8s_worker_node`: Number of control plane and worker nodes.
-
-### 3. Optional: DNS Server
-
-This project includes a BIND9 DNS server module that sets up a VM at `192.168.100.3` for `homelab.local`. It’s super handy for local DNS resolution, but you don’t have to use it if you’ve got your own DNS server.
-
-#### If you skip the DNS module:
-
-- Comment out the `bind9_server` module in `[main.tf](main.tf)`:
-
-  ```hcl
-  # module "bind9_server" { ... }
-  ```
-
-- Update the `/etc/resolv.conf` in the Kubernetes module’s cloud-init config (`[modules/proxmox/main.tf](modules/proxmox/main.tf)`). Replace:
-
-  ```yaml
-  nameserver 192.168.100.3
-  ```
-
-  with your DNS server’s IP, like:
-
-  ```yaml
-  nameserver 192.168.1.1  # Your DNS server
-  ```
-
-- Make sure your DNS server resolves `homelab.local` or adjust the `/etc/hosts` in the same file to match your domain.
-
-#### If you use the DNS module:
-
-- It auto-configures a VM with BIND9, sets up forward and reverse zones for `homelab.local`, and uses Google’s DNS (`8.8.8.8`, `8.8.4.4`) as forwarders.
-- No extra config needed unless you want to tweak the zones (see `[modules/bind9_dnsserver/main.tf](modules/bind9_dnsserver/main.tf)`).
-
-### 4. Deploy the Cluster
-
-Time to fire it up! Run these commands:
+### 3. Deploy Everything
 
 ```bash
+make all
+```
+
+That’s it. Under the hood this runs two steps, which you can also run separately:
+
+```bash
+# Step 1: create the VMs (DNS, control plane, workers)
 terraform init
-terraform plan  # Check what’s gonna happen
-terraform apply --auto-approve
+terraform apply -auto-approve
+
+# Step 2: bootstrap the cluster (DNS zones, containerd, kubeadm init/join, Calico)
+cd ansible
+ansible-playbook site.yml
 ```
 
-This will:
+`terraform apply` also generates the Ansible inventory (`ansible/inventory/hosts.yml`) and shared variables (`ansible/group_vars/all/terraform.yml`) from your Terraform values — single source of truth, nothing to copy by hand.
 
-- Spin up a DNS VM (if enabled) at `192.168.100.3`.
-- Create control plane VMs (e.g., `k8s-control-plane-0` at `192.168.100.50`) and worker nodes (e.g., `k8s-worker-0` at `192.168.100.60`).
-- Configure each VM with cloud-init to install containerd, kubeadm, and Calico CNI.
-- Bootstrap the K8s cluster using kubeadm, with the first control plane node running a temporary HTTP server (port 8000) to share the join token.
+**Something failed halfway?** Just run `ansible-playbook site.yml` again. It’s idempotent — it skips what’s done and retries what isn’t.
 
-### 5. Access Your Cluster
+### 4. Access Your Cluster
 
-Once `terraform apply` finishes (takes ~7-12 minutes), SSH into the first control plane node (`k8s-control-plane-0`):
+The deploy drops the cluster admin kubeconfig at `ansible/artifacts/kubeconfig` (gitignored). Use it straight from your machine:
 
 ```bash
-ssh ubuntu@192.168.100.50
-```
-
-Check the cluster:
-
-```bash
-export KUBECONFIG=/home/ubuntu/.kube/config
+export KUBECONFIG=$PWD/ansible/artifacts/kubeconfig
 kubectl get nodes
 ```
 
-You should see your control plane and worker nodes in `Ready` state. The kubeconfig is already set up at `/home/ubuntu/.kube/config` on the first control plane node.
+Need to fetch it again later (or on another operator's machine)? `make kubeconfig`.
+
+You can also SSH into the first control plane node (`ssh ubuntu@192.168.100.50`) — the kubeconfig is set up there at `/home/<vm_user>/.kube/config`.
+
+## 🌐 DNS
+
+The BIND9 module sets up a DNS VM (default `192.168.100.3`) with forward and reverse zones for `homelab.local`, including an A and PTR record for **every** cluster node (generated from the inventory). Upstream queries are forwarded to Google DNS (`8.8.8.8`, `8.8.4.4`).
+
+Using your own DNS server instead? Comment out the `bind9_server` module in [main.tf](main.tf), remove the `dns` play from [ansible/site.yml](ansible/site.yml), and set `resolv_nameservers` in [ansible/group_vars/k8s.yml](ansible/group_vars/k8s.yml) to your server.
 
 ## 🐛 Debugging Tips
 
-If something goes wonky, don’t panic! Here’s how to troubleshoot:
+- **Terraform errors**: usually Proxmox credentials, datastore or node name. Check `terraform plan` output.
+- **Ansible errors**: the failing task name tells you exactly what broke. Re-run with more detail:
 
-- **Check Terraform logs**: Look at the output of `terraform apply` for errors (e.g., wrong Proxmox credentials).
+  ```bash
+  ansible-playbook site.yml -v          # verbose
+  ansible-playbook site.yml --limit k8s-worker-1   # single host
+  ```
 
-- **VM logs**: SSH into a VM (e.g., `ssh ubuntu@192.168.100.50`) and check:
-
-  - `/tmp/cloud-init.log`: Main log for Kubernetes setup (control plane/worker nodes).
-  - `/tmp/dns-config.log`: DNS server setup log (if using BIND9 module).
-  - `/tmp/kubeadm-init.log`: Kubeadm initialization log on the first control plane node.
-  - `/tmp/http-server.log`: HTTP server logs for join token sharing.
-
-- **DNS issues**:
-
-  - Run `nslookup ns1.homelab.local 192.168.100.3` on a VM to test DNS resolution.
-  - If using your own DNS, verify `/etc/resolv.conf` has the right `nameserver`.
-
+- **DNS issues**: `nslookup k8s-worker-0.homelab.local 192.168.100.3` from any VM.
 - **Kubernetes issues**:
-
-  - Check `kubectl get pods -A` to see if Calico or other pods are crashing.
-  - Run `journalctl -u kubelet` on a node to debug kubelet issues.
-
+  - `kubectl get pods -A` to see if Calico or other pods are crashing.
+  - `journalctl -u kubelet` on a node to debug kubelet issues.
 - **Proxmox console**: Use the Proxmox UI to check VM status or console output if SSH fails.
-
-- **HTTP server woes**: If nodes can’t join, ensure port 8000 is open on the first control plane node (`ufw allow 8000/tcp`) and check `/tmp/k8s-join-token`.
 
 If you’re stuck, open an issue or ping me!
 
 ## 📂 Project Structure
 
-Here’s a quick rundown of the repo’s layout:
-
-### Root:
-
-- `[main.tf](main.tf)`: Calls the `bind9_server` and `proxmox` modules.
-- `[provider.tf](provider.tf)`: Configures the Proxmox provider.
-- `[variables.tf](variables.tf)`: Defines all variables (with defaults).
-- `[secret.auto.tfvars](secret.auto.tfvars)`: Your sensitive creds (gitignored for safety).
-- `[id_rsa.pub](id_rsa.pub)`: SSH public key for VM access.
-- `[LICENSE](LICENSE)`: License file (consider using MIT if not set).
-- `.terraform/`, `terraform.tfstate`, etc.: Auto-generated by Terraform.
-
-### Modules:
-
-- `[modules/bind9_dnsserver/](modules/bind9_dnsserver/)`: Sets up the BIND9 DNS server.
-- `[modules/proxmox/](modules/proxmox/)`: Deploys the Kubernetes cluster VMs.
-- `[modules/helm/](modules/helm/)`: Future Helm module for Prometheus/Grafana (commented out for now).
-
-The `[.gitignore](.gitignore)` ensures sensitive files like `secret.auto.tfvars` and Terraform state aren’t versioned. Keep it that way for security! 🔒
+```
+├── main.tf                  # Modules + Ansible inventory generation
+├── provider.tf              # Proxmox provider config
+├── variables.tf             # All variables (with defaults)
+├── outputs.tf               # Node IPs + next-step hint
+├── Makefile                 # make all / infra / cluster / destroy
+├── templates/               # Ansible inventory + vars templates
+├── modules/
+│   ├── proxmox/             # K8s VMs (minimal cloud-init: user, SSH, agent, data disk)
+│   ├── bind9_dnsserver/     # DNS VM (minimal cloud-init)
+│   └── helm/                # Future Helm module for Prometheus/Grafana
+└── ansible/
+    ├── site.yml             # The whole bootstrap, in order
+    ├── inventory/hosts.yml  # Generated by Terraform (gitignored)
+    ├── group_vars/          # K8s/Calico versions, pod subnet, DNS settings
+    └── roles/
+        ├── common/          # hostname, /etc/hosts, resolv.conf, base packages
+        ├── bind9/           # BIND9 install + zone files from inventory
+        ├── kubernetes/      # kernel modules, sysctl, containerd, kubeadm/kubelet
+        ├── control_plane/   # kubeadm init, kubeconfig, Calico, extra CP joins
+        └── worker/          # kubeadm join + node labels
+```
 
 ## 📊 Architecture
 
-Here’s the big picture:
-
-- **DNS VM (optional)**: Runs BIND9 at `192.168.100.3`, resolving `homelab.local`.
-- **Control Plane VMs**: Run kubeadm to bootstrap the cluster, starting at `192.168.100.50`.
-- **Worker Nodes**: Join the cluster, starting at `192.168.100.60`, with extra disk for OpenEBS.
+- **DNS VM**: Runs BIND9 at `192.168.100.3`, resolving `homelab.local`.
+- **Control Plane VMs**: kubeadm-bootstrapped, starting at `192.168.100.50`.
+- **Worker Nodes**: Join the cluster starting at `192.168.100.60`, with an extra disk mounted at `/var/openebs/local` for OpenEBS.
 - **Networking**: Calico CNI with pod subnet `10.45.0.0/16`, VXLAN encapsulation.
+- **Join flow**: Ansible generates the join token on the first control plane and delegates it to each node over SSH — no tokens exposed on the network.
 
 ## 🔮 Coming Soon
 
-- **Helm Charts**: There’s a TODO in `[main.tf](main.tf)` to add Helm for deploying Prometheus and Grafana (with OpenEBS storage). Stay tuned for monitoring goodness! 📈
-- **IA Node**: Planning to dedicate a node for AI workloads (maybe with Ollama, see the TODO).
+- **Helm Charts**: Prometheus and Grafana (with OpenEBS storage) via the `helm` module. 📈
+- **Multi-node Proxmox (HCI)**: spread VMs across a Proxmox cluster with Ceph storage.
+- **IA Node**: a dedicated node for AI workloads (maybe with Ollama).
 
 ## 📬 Contributing
 
-Got ideas? Found a bug? Open an issue or submit a PR. Check our `[guidelines](CONTRIBUTING.md)` for the deets.
+Got ideas? Found a bug? Open an issue or submit a PR. Check our [guidelines](CONTRIBUTING.md) for the deets.

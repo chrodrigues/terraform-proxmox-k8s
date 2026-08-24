@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+127.0.0.1 localhost
+{{ dns_server_ip }} ns1.{{ domain }} dns.{{ domain }}
+{% for host in groups['all'] %}
+{{ hostvars[host].ansible_host }} {{ host }} {{ host }}.{{ domain }}
+{% endfor %}

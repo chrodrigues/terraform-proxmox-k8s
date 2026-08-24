@@ -1,0 +1,27 @@
+---
+- name: Configure BIND9 DNS server
+  hosts: dns
+  become: true
+  roles:
+    - common
+    - bind9
+
+- name: Prepare Kubernetes nodes (containerd, kubeadm, kubelet)
+  hosts: k8s
+  become: true
+  roles:
+    - common
+    - kubernetes
+
+- name: Bootstrap control plane
+  hosts: control_plane
+  become: true
+  serial: 1 # init the first node before the others try to join
+  roles:
+    - control_plane
+
+- name: Join worker nodes
+  hosts: workers
+  become: true
+  roles:
+    - worker
