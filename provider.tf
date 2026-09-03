@@ -1,4 +1,8 @@
 terraform {
+  # Local state by default; CI passes -backend-config to point at a
+  # persistent path outside the (cleaned) pipeline workspace.
+  backend "local" {}
+
   required_providers {
     proxmox = {
       source  = "bpg/proxmox"

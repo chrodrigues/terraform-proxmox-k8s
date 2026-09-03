@@ -1,0 +1,64 @@
+---
+name: deploy-cluster
+
+# Manual trigger with per-tier sizing: change a number, hit "Run workflow",
+# and Terraform+Ansible converge the cluster to it. Scale-down note: drain
+# and remove the node from Kubernetes yourself BEFORE lowering a count.
+on:
+  workflow_dispatch:
+    inputs:
+      control_plane_count:
+        description: "Control plane nodes (masters tier)"
+        type: number
+        required: true
+        default: 1
+      worker_count:
+        description: "Worker nodes (workers tier)"
+        type: number
+        required: true
+        default: 3
+
+# Never let two deploys run at the same time
+concurrency:
+  group: cluster-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_proxmox_endpoint: ${{ vars.PROXMOX_ENDPOINT }}
+      TF_VAR_proxmox_user_name: ${{ vars.PROXMOX_USER_NAME }}
+      TF_VAR_proxmox_user_password: ${{ secrets.PROXMOX_USER_PASSWORD }}
+      TF_VAR_proxmox_vm_user: ${{ vars.PROXMOX_VM_USER }}
+      # The runner machine's own SSH key pair
+      TF_VAR_ssh_public_key_file: "~/.ssh/id_rsa.pub"
+      TF_VAR_ssh_private_key_file: "~/.ssh/id_rsa"
+      # Per-tier sizing straight from the Run workflow form
+      TF_VAR_proxmox_number_of_vm_k8s_control_plane: ${{ inputs.control_plane_count }}
+      TF_VAR_proxmox_number_of_vm_k8s_worker_node: ${{ inputs.worker_count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # State lives outside the workspace: checkout wipes untracked files,
+      # and losing the state would orphan every VM Terraform manages.
+      - name: Terraform init
+        run: |
+          mkdir -p "$HOME/.terraform-proxmox-k8s"
+          terraform init -input=false -reconfigure \
+            -backend-config="path=$HOME/.terraform-proxmox-k8s/terraform.tfstate"
+
+      - name: Terraform apply (create/scale the VMs)
+        run: terraform apply -auto-approve -input=false
+
+      - name: Bootstrap Kubernetes (Ansible)
+        working-directory: ansible
+        run: ansible-playbook site.yml
+
+      - name: Cluster status
+        working-directory: ansible
+        run: |
+          ansible 'control_plane[0]' --become -m ansible.builtin.command \
+            -a "kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes -o wide"
