@@ -162,6 +162,25 @@ If you’re stuck, open an issue or ping me!
 - **Networking**: Calico CNI with pod subnet `10.45.0.0/16`, VXLAN encapsulation.
 - **Join flow**: Ansible generates the join token on the first control plane and delegates it to each node over SSH — no tokens exposed on the network.
 
+## 🤖 CI/CD (GitHub Actions)
+
+The [`deploy-cluster`](.github/workflows/deploy.yml) workflow deploys or scales the cluster from the GitHub UI: **Actions → deploy-cluster → Run workflow**, set the node count per tier (control plane / workers), hit run. A [self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners) inside your LAN (with `terraform` and `ansible` installed) executes it — cloud runners can't reach a homelab Proxmox.
+
+Required repo configuration (Settings → Secrets and variables → Actions):
+
+| Type | Name | Example |
+|---|---|---|
+| Secret | `PROXMOX_USER_PASSWORD` | the Proxmox password |
+| Variable | `PROXMOX_ENDPOINT` | `https://192.168.100.10:8006/` |
+| Variable | `PROXMOX_USER_NAME` | `root@pam` |
+| Variable | `PROXMOX_VM_USER` | `ubuntu` |
+
+The runner machine's `~/.ssh/id_rsa(.pub)` key pair is injected into the VMs. Terraform state lives at `~/.terraform-proxmox-k8s/terraform.tfstate` on the runner, shared with manual `make` runs.
+
+**Scaling down?** Drain and remove the node from Kubernetes first (`kubectl drain` + `kubectl delete node`) — the pipeline only destroys the VM.
+
+**Public repo warning:** self-hosted runners execute code from your repo. Set *Settings → Actions → General → Require approval for all outside collaborators* so fork PRs can't run code on your machine.
+
 ## 🔮 Coming Soon
 
 - **Helm Charts**: Prometheus and Grafana (with OpenEBS storage) via the `helm` module. 📈

@@ -6,6 +6,17 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- added GitHub Actions workflow `deploy-cluster` (manual trigger with per-tier node counts) that runs Terraform and Ansible on a self-hosted runner inside the LAN
+- added shared Terraform state location (`~/.terraform-proxmox-k8s/terraform.tfstate`) used by both the `make` targets and CI, via `backend "local"` + `-backend-config`
+
+### Fixed
+
+- fixed full-cluster VM replacement when Ubuntu republishes the cloud image upstream (`overwrite = false` on the image download)
+
+## [1.0.0] - 2026-08-24
+
+### Added
+
 - added Ansible playbook (`ansible/site.yml`) with roles for DNS (BIND9), node preparation (containerd, kubeadm), control plane bootstrap (kubeadm init + Calico) and worker join
 - added automatic Ansible inventory and variables generation from Terraform (`ansible/inventory/hosts.yml` and `ansible/group_vars/all/terraform.yml`)
 - added DNS A/PTR records for every cluster node in the BIND9 zones, generated from the inventory

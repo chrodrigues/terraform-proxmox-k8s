@@ -144,7 +144,10 @@ resource "proxmox_virtual_environment_vm" "k8s-worker-node" {
 
 # Ubuntu Cloud Image
 resource "proxmox_virtual_environment_download_file" "ubuntu_cloud_image" {
-  content_type   = "iso"
+  content_type = "iso"
+  # Keep the already-downloaded image even if upstream republishes it -
+  # otherwise a size change would force replacing every VM in the cluster.
+  overwrite      = false
   datastore_id   = var.proxmox_datastore_name
   node_name      = var.proxmox_node_name
   upload_timeout = 2500

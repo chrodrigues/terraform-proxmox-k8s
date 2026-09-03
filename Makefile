@@ -1,14 +1,18 @@
 .PHONY: all infra cluster plan destroy kubeconfig
 
+# Terraform state lives outside the repo so CI and manual runs share it
+STATE ?= $(HOME)/.terraform-proxmox-k8s/terraform.tfstate
+TF_INIT = terraform init -input=false -reconfigure -backend-config="path=$(STATE)"
+
 # Full deploy: create the VMs, then bootstrap Kubernetes
 all: infra cluster
 
 infra:
-	terraform init
+	$(TF_INIT)
 	terraform apply -auto-approve
 
 plan:
-	terraform init
+	$(TF_INIT)
 	terraform plan
 
 cluster:
