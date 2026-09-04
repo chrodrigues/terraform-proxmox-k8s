@@ -9,6 +9,11 @@ All notable changes to this project are documented in this file.
 - added `bind9_extra_records` (group_vars) so the forward zone can carry static A records for cluster services; ships `argocd` and `clara` pointing at the ingress-nginx MetalLB IP (`.201`)
 - added GitHub Actions workflow `deploy-cluster` (manual trigger with per-tier node counts) that runs Terraform and Ansible on a self-hosted runner inside the LAN
 - added shared Terraform state location (`~/.terraform-proxmox-k8s/terraform.tfstate`) used by both the `make` targets and CI, via `backend "local"` + `-backend-config`
+- added a VM-replacement guard to the pipeline: the plan is inspected and the run aborts if existing VMs would be replaced, unless `allow_replace` is checked
+
+### Changed
+
+- changed the workflow node-count inputs to optional: leaving a count empty keeps the cluster's current size (read from the Terraform state) instead of falling back to a static default
 
 ### Fixed
 
