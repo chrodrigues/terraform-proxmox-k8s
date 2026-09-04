@@ -1,22 +1,28 @@
 ---
 name: deploy-cluster
 
-# Manual trigger with per-tier sizing: change a number, hit "Run workflow",
-# and Terraform+Ansible converge the cluster to it. Scale-down note: drain
-# and remove the node from Kubernetes yourself BEFORE lowering a count.
+# Manual trigger with per-tier sizing. Leave a count EMPTY to keep the
+# cluster's current size (read from the Terraform state on the runner).
+# Scale-down note: drain and remove the node from Kubernetes yourself
+# BEFORE lowering a count.
 on:
   workflow_dispatch:
     inputs:
       control_plane_count:
-        description: "Control plane nodes (masters tier)"
-        type: number
-        required: true
-        default: 1
+        description: "Control plane nodes (masters tier). Empty = keep current"
+        type: string
+        required: false
+        default: ""
       worker_count:
-        description: "Worker nodes (workers tier)"
-        type: number
-        required: true
-        default: 3
+        description: "Worker nodes (workers tier). Empty = keep current"
+        type: string
+        required: false
+        default: ""
+      allow_replace:
+        description: "Allow replacing existing VMs (DANGER: rebuilds them from scratch)"
+        type: boolean
+        required: false
+        default: false
 
 # Never let two deploys run at the same time
 concurrency:
@@ -35,9 +41,6 @@ jobs:
       # The runner machine's own SSH key pair
       TF_VAR_ssh_public_key_file: "~/.ssh/id_rsa.pub"
       TF_VAR_ssh_private_key_file: "~/.ssh/id_rsa"
-      # Per-tier sizing straight from the Run workflow form
-      TF_VAR_proxmox_number_of_vm_k8s_control_plane: ${{ inputs.control_plane_count }}
-      TF_VAR_proxmox_number_of_vm_k8s_worker_node: ${{ inputs.worker_count }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,8 +53,38 @@ jobs:
           terraform init -input=false -reconfigure \
             -backend-config="path=$HOME/.terraform-proxmox-k8s/terraform.tfstate"
 
+      # Empty inputs mean "keep the current size": read it from the state
+      # outputs. Falls back to the repo defaults on a first-ever deploy.
+      - name: Resolve node counts
+        run: |
+          CP='${{ inputs.control_plane_count }}'
+          WK='${{ inputs.worker_count }}'
+          count() { terraform output -json "$1" 2>/dev/null \
+            | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null; }
+          [ -z "$CP" ] && CP=$(count control_plane_nodes) || true
+          [ -z "$WK" ] && WK=$(count worker_nodes) || true
+          CP="${CP:-1}"; WK="${WK:-3}"
+          echo "Control planes: $CP | Workers: $WK"
+          echo "TF_VAR_proxmox_number_of_vm_k8s_control_plane=$CP" >> "$GITHUB_ENV"
+          echo "TF_VAR_proxmox_number_of_vm_k8s_worker_node=$WK" >> "$GITHUB_ENV"
+
+      - name: Terraform plan
+        run: terraform plan -input=false -out=tfplan | tee plan.txt
+
+      # Replacing a VM destroys and rebuilds it. That must never happen as a
+      # side effect (e.g. a changed cloud-init/SSH key) - only on purpose.
+      - name: Guard against VM replacement
+        if: ${{ inputs.allow_replace != true }}
+        run: |
+          if grep -q 'must be replaced' plan.txt; then
+            echo "::error::Plan wants to REPLACE existing VMs (see plan above)."
+            echo "::error::If this is intentional, re-run with allow_replace=true."
+            exit 1
+          fi
+          echo "No replacements planned."
+
       - name: Terraform apply (create/scale the VMs)
-        run: terraform apply -auto-approve -input=false
+        run: terraform apply -input=false tfplan
 
       - name: Bootstrap Kubernetes (Ansible)
         working-directory: ansible
