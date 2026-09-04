@@ -86,9 +86,16 @@ jobs:
       - name: Terraform apply (create/scale the VMs)
         run: terraform apply -input=false tfplan
 
-      - name: Bootstrap Kubernetes (Ansible)
+      - name: Bootstrap Kubernetes + Argo CD (Ansible)
         working-directory: ansible
-        run: ansible-playbook site.yml
+        env:
+          # Argo CD hand-over to chrodrigues/homelab-gitops (private): token with repo read + commit status.
+          GITOPS_GITHUB_TOKEN: ${{ secrets.GITOPS_GITHUB_TOKEN }}
+          ONEPASSWORD_SA_TOKEN: ${{ secrets.ONEPASSWORD_SA_TOKEN }}
+        run: |
+          ansible-playbook site.yml \
+            -e "gitops_github_token=${GITOPS_GITHUB_TOKEN}" \
+            -e "onepassword_sa_token=${ONEPASSWORD_SA_TOKEN}"
 
       - name: Cluster status
         working-directory: ansible

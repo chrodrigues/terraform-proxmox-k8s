@@ -25,3 +25,10 @@
   become: true
   roles:
     - worker
+
+- name: Bootstrap Argo CD (GitOps hand-over)
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - role: argocd_bootstrap
+      when: argocd_bootstrap_enabled | bool
