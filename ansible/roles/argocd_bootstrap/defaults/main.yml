@@ -1,0 +1,13 @@
+---
+# Bootstraps Argo CD on the first control plane node and hands the cluster over to the GitOps repo.
+# Everything after this (MetalLB, ingress, External Secrets, workloads) is declared in homelab-gitops.
+argocd_bootstrap_enabled: true
+argocd_chart_version: "10.7.1"
+argocd_namespace: argocd
+gitops_repo_url: https://github.com/chrodrigues/homelab-gitops.git
+gitops_repo_branch: main
+gitops_repo_owner: chrodrigues
+# Secrets injected by the pipeline (never committed). Empty values skip the dependent steps.
+gitops_github_token: ""        # read access to the private homelab-gitops repo + commit statuses
+onepassword_sa_token: ""       # 1Password service account used by External Secrets
+helm_version: "v3.19.0"

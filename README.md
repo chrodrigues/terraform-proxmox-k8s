@@ -164,6 +164,8 @@ If you’re stuck, open an issue or ping me!
 
 ## 🤖 CI/CD (GitHub Actions)
 
+After the nodes join, the `argocd_bootstrap` role installs Argo CD and applies the root app of [`homelab-gitops`](https://github.com/chrodrigues/homelab-gitops); from there everything on the cluster is GitOps. It needs two repository secrets: `GITOPS_GITHUB_TOKEN` (read access to the private GitOps repo) and `ONEPASSWORD_SA_TOKEN` (External Secrets). Without them the role still installs Argo CD but skips the credential Secrets.
+
 The [`deploy-cluster`](.github/workflows/deploy.yml) workflow deploys or scales the cluster from the GitHub UI: **Actions → deploy-cluster → Run workflow**. Set a node count per tier (control plane / workers) only when you want to change it — an **empty count keeps the current size**, read from the Terraform state. The run also aborts if the plan would **replace** existing VMs (a changed cloud-init or SSH key, for example); tick `allow_replace` only when that is intentional. A [self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners) inside your LAN (with `terraform` and `ansible` installed) executes it — cloud runners can't reach a homelab Proxmox.
 
 Required repo configuration (Settings → Secrets and variables → Actions):

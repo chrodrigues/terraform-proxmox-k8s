@@ -1,0 +1,77 @@
+---
+- name: Install helm
+  ansible.builtin.unarchive:
+    src: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: /tmp/linux-amd64/helm
+
+- name: Copy helm binary
+  ansible.builtin.copy:
+    src: /tmp/linux-amd64/helm
+    dest: /usr/local/bin/helm
+    mode: "0755"
+    remote_src: true
+
+- name: Clone the GitOps repo (values for the Argo CD chart)
+  ansible.builtin.git:
+    repo: "https://{{ gitops_repo_owner }}:{{ gitops_github_token }}@{{ gitops_repo_url | regex_replace('^https://', '') }}"
+    dest: /opt/homelab-gitops
+    version: "{{ gitops_repo_branch }}"
+    force: true
+  no_log: true
+
+- name: Namespaces
+  ansible.builtin.shell: >
+    set -o pipefail;
+    kubectl create namespace {{ item }} --dry-run=client -o yaml | kubectl apply -f -
+  args: {executable: /bin/bash}
+  loop: [argocd, external-secrets]
+  environment: {KUBECONFIG: /etc/kubernetes/admin.conf}
+  changed_when: false
+
+- name: 1Password service-account token Secret
+  ansible.builtin.shell: >
+    set -o pipefail;
+    kubectl -n external-secrets create secret generic onepassword-token
+    --from-literal=token='{{ onepassword_sa_token }}' --dry-run=client -o yaml | kubectl apply -f -
+  args: {executable: /bin/bash}
+  environment: {KUBECONFIG: /etc/kubernetes/admin.conf}
+  when: onepassword_sa_token | length > 0
+  no_log: true
+  changed_when: false
+
+- name: Argo CD repository credential (private GitOps repo)
+  ansible.builtin.shell: >
+    set -o pipefail;
+    kubectl -n argocd create secret generic repo-homelab-gitops
+    --from-literal=type=git --from-literal=url={{ gitops_repo_url }}
+    --from-literal=username={{ gitops_repo_owner }} --from-literal=password='{{ gitops_github_token }}'
+    --dry-run=client -o yaml | kubectl apply -f - &&
+    kubectl -n argocd label secret repo-homelab-gitops argocd.argoproj.io/secret-type=repository --overwrite
+  args: {executable: /bin/bash}
+  environment: {KUBECONFIG: /etc/kubernetes/admin.conf}
+  when: gitops_github_token | length > 0
+  no_log: true
+  changed_when: false
+
+- name: Argo CD helm repo
+  ansible.builtin.command: helm repo add argo https://argoproj.github.io/argo-helm
+  register: argocd_helm_repo
+  changed_when: "'has been added' in argocd_helm_repo.stdout"
+  failed_when: argocd_helm_repo.rc != 0 and 'already exists' not in argocd_helm_repo.stderr
+
+- name: Install or upgrade Argo CD
+  ansible.builtin.command: >
+    helm upgrade --install argocd argo/argo-cd --version {{ argocd_chart_version }}
+    --namespace {{ argocd_namespace }} --create-namespace
+    --values /opt/homelab-gitops/bootstrap/argocd/values.yaml --wait --timeout 10m
+  environment: {KUBECONFIG: /etc/kubernetes/admin.conf}
+  register: argocd_helm
+  changed_when: "'has been upgraded' in argocd_helm.stdout or 'STATUS: deployed' in argocd_helm.stdout"
+
+- name: Root application (app-of-apps)
+  ansible.builtin.command: kubectl apply -f /opt/homelab-gitops/bootstrap/root-app.yaml
+  environment: {KUBECONFIG: /etc/kubernetes/admin.conf}
+  register: argocd_root
+  changed_when: "'created' in argocd_root.stdout or 'configured' in argocd_root.stdout"
