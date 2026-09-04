@@ -10,7 +10,7 @@ This project automates the deployment of a Kubernetes cluster on Proxmox using *
 - **Ansible**: Installs and bootstraps the cluster (DNS, containerd, kubeadm, Calico).
 - **Proxmox VE**: Hypervisor for running our VMs.
 - **Kubernetes (v1.30)**: Kubeadm for cluster setup, Calico for networking.
-- **BIND9**: DNS server for `homelab.local` resolution (forward + reverse zones with a record for every node).
+- **BIND9**: DNS server for `home.arpa` resolution (forward + reverse zones with a record for every node).
 - **Ubuntu 22.04**: Base image for all VMs.
 - **containerd**: Container runtime for K8s.
 
@@ -107,7 +107,7 @@ You can also SSH into the first control plane node (`ssh ubuntu@192.168.100.50`)
 
 ## 🌐 DNS
 
-The BIND9 module sets up a DNS VM (default `192.168.100.3`) with forward and reverse zones for `homelab.local`, including an A and PTR record for **every** cluster node (generated from the inventory). Upstream queries are forwarded to Google DNS (`8.8.8.8`, `8.8.4.4`).
+The BIND9 module sets up a DNS VM (default `192.168.100.3`) with forward and reverse zones for `home.arpa`, including an A and PTR record for **every** cluster node (generated from the inventory). Upstream queries are forwarded to Google DNS (`8.8.8.8`, `8.8.4.4`).
 
 Using your own DNS server instead? Comment out the `bind9_server` module in [main.tf](main.tf), remove the `dns` play from [ansible/site.yml](ansible/site.yml), and set `resolv_nameservers` in [ansible/group_vars/k8s.yml](ansible/group_vars/k8s.yml) to your server.
 
@@ -121,7 +121,7 @@ Using your own DNS server instead? Comment out the `bind9_server` module in [mai
   ansible-playbook site.yml --limit k8s-worker-1   # single host
   ```
 
-- **DNS issues**: `nslookup k8s-worker-0.homelab.local 192.168.100.3` from any VM.
+- **DNS issues**: `nslookup k8s-worker-0.home.arpa 192.168.100.3` from any VM.
 - **Kubernetes issues**:
   - `kubectl get pods -A` to see if Calico or other pods are crashing.
   - `journalctl -u kubelet` on a node to debug kubelet issues.
@@ -156,7 +156,7 @@ If you’re stuck, open an issue or ping me!
 
 ## 📊 Architecture
 
-- **DNS VM**: Runs BIND9 at `192.168.100.3`, resolving `homelab.local`.
+- **DNS VM**: Runs BIND9 at `192.168.100.3`, resolving `home.arpa`.
 - **Control Plane VMs**: kubeadm-bootstrapped, starting at `192.168.100.50`.
 - **Worker Nodes**: Join the cluster starting at `192.168.100.60`, with an extra disk mounted at `/var/openebs/local` for OpenEBS.
 - **Networking**: Calico CNI with pod subnet `10.45.0.0/16`, VXLAN encapsulation.

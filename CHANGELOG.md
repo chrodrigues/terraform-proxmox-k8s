@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- changed the default DNS domain from `homelab.local` to `home.arpa` (RFC 8375): `.local` is reserved for mDNS, so systemd-resolved and other stub resolvers refuse to send it to a unicast DNS server. Only Ansible-rendered files change (resolv.conf search, /etc/hosts, BIND zone); no VM is replaced
+
 ### Added
 
 - added `bind9_extra_records` (group_vars) so the forward zone can carry static A records for cluster services; ships `argocd` and `clara` pointing at the ingress-nginx MetalLB IP (`.201`)

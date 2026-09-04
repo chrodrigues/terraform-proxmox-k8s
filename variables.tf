@@ -112,7 +112,7 @@ variable "k8s_worker_ip_start" {
 variable "domain" {
   description = "Local DNS domain for the cluster"
   type        = string
-  default     = "homelab.local"
+  default     = "home.arpa"
 }
 
 variable "timezone" {
