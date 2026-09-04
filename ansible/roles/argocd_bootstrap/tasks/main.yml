@@ -13,6 +13,15 @@
     mode: "0755"
     remote_src: true
 
+# Fail fast with a readable message - the clone below runs with no_log,
+# so an empty token would otherwise die as a censored, undebuggable error.
+- name: Require the GitOps token
+  ansible.builtin.assert:
+    that: gitops_github_token | length > 0
+    fail_msg: >-
+      gitops_github_token is empty. Create the GITOPS_GITHUB_TOKEN repository
+      secret (fine-grained PAT with read access to {{ gitops_repo_url }}).
+
 - name: Clone the GitOps repo (values for the Argo CD chart)
   ansible.builtin.git:
     repo: "https://{{ gitops_repo_owner }}:{{ gitops_github_token }}@{{ gitops_repo_url | regex_replace('^https://', '') }}"

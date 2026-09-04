@@ -18,6 +18,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- fixed the argocd_bootstrap role failing with a censored no_log error when the GitOps token secret is missing (an assert now fails fast with a clear message)
 - fixed full-cluster VM replacement when Ubuntu republishes the cloud image upstream (`overwrite = false` on the image download)
 
 ## [1.0.0] - 2026-08-24
