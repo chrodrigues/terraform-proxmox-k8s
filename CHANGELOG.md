@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- added `bind9_extra_records` (group_vars) so the forward zone can carry static A records for cluster services; ships `argocd` and `clara` pointing at the ingress-nginx MetalLB IP (`.201`)
 - added GitHub Actions workflow `deploy-cluster` (manual trigger with per-tier node counts) that runs Terraform and Ansible on a self-hosted runner inside the LAN
 - added shared Terraform state location (`~/.terraform-proxmox-k8s/terraform.tfstate`) used by both the `make` targets and CI, via `backend "local"` + `-backend-config`
 

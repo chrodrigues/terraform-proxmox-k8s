@@ -12,3 +12,9 @@ pod_subnet: "10.45.0.0/16"
 upstream_dns_servers:
   - 8.8.8.8
   - 8.8.4.4
+
+# Extra A records in the forward zone (besides one record per inventory host).
+# Used for services exposed by the cluster's ingress (MetalLB IP of ingress-nginx).
+bind9_extra_records:
+  - {name: argocd, ip: "{{ network_prefix }}.201"}
+  - {name: clara, ip: "{{ network_prefix }}.201"}
