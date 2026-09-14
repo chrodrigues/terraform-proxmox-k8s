@@ -14,6 +14,7 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- changed the default worker VM memory from 6 GB to 12 GB
 - changed the workflow node-count inputs to optional: leaving a count empty keeps the cluster's current size (read from the Terraform state) instead of falling back to a static default
 
 ### Fixed

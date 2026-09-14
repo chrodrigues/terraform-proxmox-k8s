@@ -66,7 +66,7 @@ variable "worker_cores" {
 variable "worker_memory" {
   description = "Memory (MB) per worker VM"
   type        = number
-  default     = 6144
+  default     = 12288
 }
 
 variable "worker_disk_size" {
