@@ -48,7 +48,7 @@ variable "control_plane_cores" {
 variable "control_plane_memory" {
   description = "Memory (MB) per control plane VM"
   type        = number
-  default     = 4096
+  default     = 6144
 }
 
 variable "control_plane_disk_size" {
@@ -66,7 +66,7 @@ variable "worker_cores" {
 variable "worker_memory" {
   description = "Memory (MB) per worker VM"
   type        = number
-  default     = 6144
+  default     = 12288
 }
 
 variable "worker_disk_size" {

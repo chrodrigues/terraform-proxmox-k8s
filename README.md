@@ -158,7 +158,7 @@ If you’re stuck, open an issue or ping me!
 
 - **DNS VM**: Runs BIND9 at `192.168.100.3`, resolving `homelab.local`.
 - **Control Plane VMs**: kubeadm-bootstrapped, starting at `192.168.100.50`.
-- **Worker Nodes**: Join the cluster starting at `192.168.100.60`, with an extra disk mounted at `/var/openebs/local` for OpenEBS.
+- **Worker Nodes**: Join the cluster starting at `192.168.100.60`, with an extra 100 GB disk (`/dev/vdb`, label `openebs`) that the `openebs_disk` Ansible role mounts at `/var/openebs/local` for OpenEBS LocalPV (plus a bind mount for `/var/local/openebs/localpv-hostpath`).
 - **Networking**: Calico CNI with pod subnet `10.45.0.0/16`, VXLAN encapsulation.
 - **Join flow**: Ansible generates the join token on the first control plane and delegates it to each node over SSH — no tokens exposed on the network.
 

@@ -86,6 +86,12 @@ jobs:
       - name: Terraform apply (create/scale the VMs)
         run: terraform apply -input=false tfplan
 
+      # A memory/CPU change makes the provider reboot the VMs; give them time
+      # to come back before Ansible knocks on the door.
+      - name: Wait for all nodes to be reachable
+        working-directory: ansible
+        run: ansible all -m ansible.builtin.wait_for_connection -a "timeout=300 sleep=5"
+
       - name: Bootstrap Kubernetes + Argo CD (Ansible)
         working-directory: ansible
         env:
