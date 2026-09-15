@@ -1,0 +1,4 @@
+---
+- name: Reload systemd units generated from fstab
+  ansible.builtin.systemd:
+    daemon_reload: true

@@ -24,6 +24,7 @@
   hosts: workers
   become: true
   roles:
+    - openebs_disk # mount the 100 GB data disk before OpenEBS can write to the root disk
     - worker
 
 - name: Bootstrap Argo CD (GitOps hand-over)
