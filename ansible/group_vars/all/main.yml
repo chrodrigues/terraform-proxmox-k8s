@@ -18,3 +18,4 @@ upstream_dns_servers:
 bind9_extra_records:
   - {name: argocd, ip: "{{ network_prefix }}.201"}
   - {name: clara, ip: "{{ network_prefix }}.201"}
+  - {name: remedio, ip: "{{ network_prefix }}.201"}

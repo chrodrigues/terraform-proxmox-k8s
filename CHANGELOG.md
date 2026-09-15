@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- added the `remedio` A record (`remedio.homelab.local` -> ingress `.201`) to `bind9_extra_records` for the Remédio Certo API
 - added the `openebs_disk` Ansible role (runs on the workers before they join): mounts the 100 GB data disk at `/var/openebs/local` by filesystem label (`LABEL=openebs`), bind-mounts `/var/local/openebs/localpv-hostpath` (Loki/MinIO LocalPV BasePaths) onto the same disk, and refuses to mount over a directory that already holds data on the root disk
 - added the `argocd_bootstrap` Ansible role (runs on the first control plane after the cluster is up): installs helm, clones `chrodrigues/homelab-gitops`, creates the 1Password token and Argo CD repository-credential Secrets, installs Argo CD from the chart with the repo's values and applies the root app-of-apps. Needs the `GITOPS_GITHUB_TOKEN` and `ONEPASSWORD_SA_TOKEN` repository secrets
 - added `bind9_extra_records` (group_vars) so the forward zone can carry static A records for cluster services; ships `argocd` and `clara` pointing at the ingress-nginx MetalLB IP (`.201`)
