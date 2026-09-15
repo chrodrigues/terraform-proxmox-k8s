@@ -1,0 +1,17 @@
+---
+# The OpenEBS data disk (/dev/vdb on the workers) is partitioned and
+# formatted by cloud-init (label "openebs"), but mounted here, by Ansible.
+# cloud-init 26.x wrote the fstab entry with a bare "vdb1" device name that
+# mount cannot resolve, and fixing that in the cloud-init snippet would
+# force Terraform to replace every VM. Managing the mount here avoids both.
+openebs_disk_label: openebs
+openebs_disk_fstype: ext4
+openebs_disk_mountpoint: /var/openebs/local
+openebs_disk_mount_opts: defaults,nofail
+
+# Other OpenEBS LocalPV hostpath BasePaths that live outside the mountpoint
+# (e.g. the Loki and MinIO StorageClasses) are bind-mounted from a directory
+# on the data disk so they do not land on the 30 GB root disk either.
+openebs_disk_bind_mounts:
+  - src: "{{ openebs_disk_mountpoint }}/localpv-hostpath"
+    dest: /var/local/openebs/localpv-hostpath

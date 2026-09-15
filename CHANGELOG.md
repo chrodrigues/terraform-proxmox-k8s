@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- added the `openebs_disk` Ansible role (runs on the workers before they join): mounts the 100 GB data disk at `/var/openebs/local` by filesystem label (`LABEL=openebs`), bind-mounts `/var/local/openebs/localpv-hostpath` (Loki/MinIO LocalPV BasePaths) onto the same disk, and refuses to mount over a directory that already holds data on the root disk
 - added the `argocd_bootstrap` Ansible role (runs on the first control plane after the cluster is up): installs helm, clones `chrodrigues/homelab-gitops`, creates the 1Password token and Argo CD repository-credential Secrets, installs Argo CD from the chart with the repo's values and applies the root app-of-apps. Needs the `GITOPS_GITHUB_TOKEN` and `ONEPASSWORD_SA_TOKEN` repository secrets
 - added `bind9_extra_records` (group_vars) so the forward zone can carry static A records for cluster services; ships `argocd` and `clara` pointing at the ingress-nginx MetalLB IP (`.201`)
 - added GitHub Actions workflow `deploy-cluster` (manual trigger with per-tier node counts) that runs Terraform and Ansible on a self-hosted runner inside the LAN
@@ -20,6 +21,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- fixed the OpenEBS data disk (`/dev/vdb`, 100 GB) never being mounted on the workers: cloud-init 26.x wrote the fstab entry with a bare `vdb1` device name that mount cannot resolve, so every LocalPV landed on the 30 GB root disk. The mount is now owned by the `openebs_disk` role instead of cloud-init (changing the cloud-init snippet would replace every VM); existing PVC data was migrated by hand onto the data disk
 - fixed the pipeline racing rebooted VMs: a wait_for_connection step now runs between terraform apply and the Ansible playbook
 
 - fixed the argocd_bootstrap role failing with a censored no_log error when the GitOps token secret is missing (an assert now fails fast with a clear message)

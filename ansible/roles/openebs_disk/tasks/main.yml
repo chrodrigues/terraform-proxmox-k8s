@@ -1,0 +1,140 @@
+---
+- name: Find the OpenEBS data partition by filesystem label
+  ansible.builtin.command: "blkid -L {{ openebs_disk_label }}"
+  register: openebs_disk_device
+  changed_when: false
+  failed_when: false
+
+- name: Fail if the data disk is missing (OpenEBS would silently fill the root disk)
+  ansible.builtin.assert:
+    that: openebs_disk_device.rc == 0
+    fail_msg: >-
+      No partition labelled '{{ openebs_disk_label }}' on {{ inventory_hostname }}.
+      Check the VM's second disk and the cloud-init disk_setup/fs_setup output.
+
+- name: Remove the broken cloud-init fstab entry (bare device name without /dev/)
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^vdb1\s'
+    state: absent
+  notify: Reload systemd units generated from fstab
+
+- name: Ensure the fstab entry for the data disk
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^LABEL={{ openebs_disk_label }}\s'
+    line: >-
+      LABEL={{ openebs_disk_label }} {{ openebs_disk_mountpoint }}
+      {{ openebs_disk_fstype }} {{ openebs_disk_mount_opts }} 0 0
+  notify: Reload systemd units generated from fstab
+
+- name: Ensure the fstab entries for the bind mounts
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^\S+\s+{{ item.dest }}\s'
+    line: "{{ item.src }} {{ item.dest }} none bind,nofail 0 0"
+  loop: "{{ openebs_disk_bind_mounts }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  notify: Reload systemd units generated from fstab
+
+- name: Flush handlers so systemd sees the new fstab before mounting
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure the mountpoints exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ [openebs_disk_mountpoint] + openebs_disk_bind_mounts | map(attribute='dest') | list }}"
+
+- name: Check whether the data disk is already mounted
+  ansible.builtin.command: "findmnt --noheadings --output SOURCE {{ openebs_disk_mountpoint }}"
+  register: openebs_disk_mounted
+  changed_when: false
+  failed_when: false
+
+# Anything already under the mountpoint on the root disk (e.g. a PVC created
+# before the disk was mounted) would be hidden by the mount. Stop and let a
+# human migrate it instead of silently orphaning data.
+- name: Look for data on the root disk under the mountpoint
+  ansible.builtin.find:
+    paths: "{{ openebs_disk_mountpoint }}"
+    file_type: any
+    excludes: lost+found
+  register: openebs_disk_stale_data
+  when: openebs_disk_mounted.rc != 0
+
+- name: Fail if the mountpoint already holds data on the root disk
+  ansible.builtin.assert:
+    that: openebs_disk_stale_data.matched == 0
+    fail_msg: >-
+      {{ openebs_disk_mountpoint }} on {{ inventory_hostname }} is not mounted but
+      contains {{ openebs_disk_stale_data.matched }} entries on the root disk.
+      Move them onto the data disk first (see CHANGELOG / runbook), then re-run.
+  when: openebs_disk_mounted.rc != 0
+
+# The runner ships ansible-core only (no ansible.posix collection), so the
+# fstab entry is managed with lineinfile and mounted with plain mount(8).
+- name: Mount the data disk
+  ansible.builtin.command: "mount {{ openebs_disk_mountpoint }}" # noqa: command-instead-of-module
+  when: openebs_disk_mounted.rc != 0
+  changed_when: true
+
+- name: Ensure the bind-mount source directories exist on the data disk
+  ansible.builtin.file:
+    path: "{{ item.src }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ openebs_disk_bind_mounts }}"
+  loop_control:
+    label: "{{ item.src }}"
+
+- name: Check whether the bind mounts are already mounted
+  ansible.builtin.command: "findmnt --noheadings --output SOURCE {{ item.dest }}"
+  register: openebs_disk_bind_mounted
+  loop: "{{ openebs_disk_bind_mounts }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  changed_when: false
+  failed_when: false
+
+- name: Look for data on the root disk under the bind-mount targets
+  ansible.builtin.find:
+    paths: "{{ item.item.dest }}"
+    file_type: any
+  register: openebs_disk_bind_stale_data
+  loop: "{{ openebs_disk_bind_mounted.results }}"
+  loop_control:
+    label: "{{ item.item.dest }}"
+  when: item.rc != 0
+
+- name: Fail if a bind-mount target already holds data on the root disk
+  ansible.builtin.assert:
+    that: item.matched == 0
+    fail_msg: >-
+      {{ item.item.item.dest }} on {{ inventory_hostname }} is not mounted but
+      contains {{ item.matched }} entries on the root disk. Move them to
+      {{ item.item.item.src }} first, then re-run.
+  loop: "{{ openebs_disk_bind_stale_data.results }}"
+  loop_control:
+    label: "{{ item.item.item.dest }}"
+  when: not item.skipped | default(false)
+
+- name: Mount the bind mounts
+  ansible.builtin.command: "mount {{ item.item.dest }}" # noqa: command-instead-of-module
+  loop: "{{ openebs_disk_bind_mounted.results }}"
+  loop_control:
+    label: "{{ item.item.dest }}"
+  when: item.rc != 0
+  changed_when: true
+
+- name: Verify the mountpoint is backed by the data disk
+  ansible.builtin.command: "findmnt --noheadings --output LABEL {{ openebs_disk_mountpoint }}"
+  register: openebs_disk_verify
+  changed_when: false
+  failed_when: openebs_disk_verify.stdout | trim != openebs_disk_label

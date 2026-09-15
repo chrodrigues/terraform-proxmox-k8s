@@ -1,6 +1,13 @@
 # Minimal cloud-init: user, SSH key, qemu-guest-agent and the OpenEBS data
 # disk (workers only - the mount is "nofail" so control planes ignore it).
 # Everything else (DNS, containerd, Kubernetes) is done by Ansible.
+#
+# KNOWN ISSUE - do not "fix" here: the `mounts` entry below uses a bare
+# "vdb1" device name. cloud-init 26.x cannot resolve it and writes it to
+# /etc/fstab verbatim, so the mount fails at boot. The Ansible role
+# `openebs_disk` removes that line and mounts the disk by LABEL=openebs.
+# Editing this snippet changes the cloud-init content and makes Terraform
+# REPLACE every VM, so the fstab line is left as-is on purpose.
 resource "proxmox_virtual_environment_file" "k8s_cloud_config" {
   content_type = "snippets"
   datastore_id = var.proxmox_datastore_name
