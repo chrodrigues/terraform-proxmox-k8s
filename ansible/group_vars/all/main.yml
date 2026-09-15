@@ -19,3 +19,7 @@ bind9_extra_records:
   - {name: argocd, ip: "{{ network_prefix }}.201"}
   - {name: clara, ip: "{{ network_prefix }}.201"}
   - {name: remedio, ip: "{{ network_prefix }}.201"}
+  - {name: grafana, ip: "{{ network_prefix }}.201"}
+  - {name: prometheus, ip: "{{ network_prefix }}.201"}
+  - {name: minio, ip: "{{ network_prefix }}.201"}    # MinIO console
+  - {name: s3, ip: "{{ network_prefix }}.201"}       # MinIO S3 API
