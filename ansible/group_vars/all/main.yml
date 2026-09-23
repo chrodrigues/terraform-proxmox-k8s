@@ -23,3 +23,4 @@ bind9_extra_records:
   - {name: prometheus, ip: "{{ network_prefix }}.201"}
   - {name: minio, ip: "{{ network_prefix }}.201"}    # MinIO console
   - {name: s3, ip: "{{ network_prefix }}.201"}       # MinIO S3 API
+  - {name: chops, ip: "{{ network_prefix }}.201"}    # ClickHouse admin console
