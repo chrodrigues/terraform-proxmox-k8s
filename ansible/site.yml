@@ -6,6 +6,13 @@
     - common
     - bind9
 
+- name: Tailscale subnet router (remote access to the LAN)
+  hosts: vpn
+  become: true
+  roles:
+    - common
+    - tailscale
+
 - name: Prepare Kubernetes nodes (containerd, kubeadm, kubelet)
   hosts: k8s
   become: true

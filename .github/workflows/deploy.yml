@@ -99,11 +99,14 @@ jobs:
           GITOPS_GITHUB_TOKEN: ${{ secrets.GITOPS_GITHUB_TOKEN }}
           ONEPASSWORD_SA_TOKEN: ${{ secrets.ONEPASSWORD_SA_TOKEN }}
           ONEPASSWORD_COMPANY_SA_TOKEN: ${{ secrets.ONEPASSWORD_COMPANY_SA_TOKEN }}
+          # Only used the first time the Tailscale router VM joins the tailnet.
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
         run: |
           ansible-playbook site.yml \
             -e "gitops_github_token=${GITOPS_GITHUB_TOKEN}" \
             -e "onepassword_sa_token=${ONEPASSWORD_SA_TOKEN}" \
-            -e "onepassword_company_sa_token=${ONEPASSWORD_COMPANY_SA_TOKEN}"
+            -e "onepassword_company_sa_token=${ONEPASSWORD_COMPANY_SA_TOKEN}" \
+            -e "tailscale_auth_key=${TAILSCALE_AUTH_KEY}"
 
       - name: Cluster status
         working-directory: ansible

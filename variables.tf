@@ -97,6 +97,12 @@ variable "dns_server_ip" {
   default     = "192.168.100.3"
 }
 
+variable "tailscale_router_ip" {
+  description = "IP address of the Tailscale subnet router VM"
+  type        = string
+  default     = "192.168.100.4"
+}
+
 variable "k8s_control_plane_ip_start" {
   description = "Last octet of the first control plane IP (e.g. 50 -> 192.168.100.50)"
   type        = number
