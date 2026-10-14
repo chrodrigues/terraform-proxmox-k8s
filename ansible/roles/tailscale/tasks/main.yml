@@ -1,0 +1,76 @@
+---
+- name: Enable IP forwarding (required to route the LAN for tailnet clients)
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-tailscale.conf
+    content: |
+      net.ipv4.ip_forward          = 1
+      net.ipv6.conf.all.forwarding = 1
+    mode: "0644"
+  notify: Apply sysctl settings
+
+- name: Flush handlers (forwarding must be on before tailscale advertises routes)
+  ansible.builtin.meta: flush_handlers
+
+- name: Add Tailscale apt repository
+  ansible.builtin.deb822_repository:
+    name: tailscale
+    types: deb
+    uris: https://pkgs.tailscale.com/stable/ubuntu
+    suites: "{{ ansible_distribution_release }}"
+    components: main
+    signed_by: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_distribution_release }}.noarmor.gpg"
+
+- name: Install Tailscale
+  ansible.builtin.apt:
+    name: tailscale
+    state: present
+    update_cache: true
+
+# Starts on every boot and reconnects by itself after power or internet loss.
+- name: Enable tailscaled
+  ansible.builtin.systemd:
+    name: tailscaled
+    enabled: true
+    state: started
+
+- name: Read Tailscale login state
+  ansible.builtin.command: tailscale status --json
+  register: tailscale_status
+  changed_when: false
+  failed_when: false
+
+- name: Decide whether this node still needs to join the tailnet
+  ansible.builtin.set_fact:
+    tailscale_needs_login: >-
+      {{ tailscale_status.rc != 0
+         or (tailscale_status.stdout | from_json).BackendState != 'Running' }}
+
+# Fail fast with a readable message - the join below runs with no_log.
+- name: Require the auth key for the first join
+  ansible.builtin.assert:
+    that: tailscale_auth_key | length > 0
+    fail_msg: >-
+      tailscale_auth_key is empty and this node is not logged in yet.
+      Create the TAILSCALE_AUTH_KEY repository secret (Tailscale admin console
+      -> Settings -> Keys -> Generate auth key).
+  when: tailscale_needs_login | bool
+
+- name: Join the tailnet as a subnet router
+  ansible.builtin.command: >-
+    tailscale up
+    --auth-key={{ tailscale_auth_key }}
+    --hostname={{ tailscale_hostname }}
+    --advertise-routes={{ tailscale_advertise_routes }}
+    --accept-dns=false
+  when: tailscale_needs_login | bool
+  changed_when: true
+  no_log: true
+
+# Keeps the settings converged on later runs without needing the auth key.
+- name: Apply subnet router settings
+  ansible.builtin.command: >-
+    tailscale set
+    --hostname={{ tailscale_hostname }}
+    --advertise-routes={{ tailscale_advertise_routes }}
+    --accept-dns=false
+  changed_when: false

@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- added the `tailscale-router` VM (`192.168.100.4`, 1 vCPU / 1 GB) and the `tailscale` Ansible role: joins the tailnet as `homelab` and advertises `192.168.100.0/24` as a subnet route, giving remote access to the apps, the kube API and RDP. The first join needs the `TAILSCALE_AUTH_KEY` repository secret
 - added the `onepassword_company_sa_token` input to the `argocd_bootstrap` role (GitHub secret `ONEPASSWORD_COMPANY_SA_TOKEN`), creating the `onepassword-company-token` Secret that Clara's External Secrets stores use
 - added DNS A records `grafana`, `prometheus`, `minio` and `s3` (`homelab.local`, pointing at the ingress IP `.201`) for the kube-prometheus-stack and MinIO apps deployed by `homelab-gitops`
 - added the `remedio` A record (`remedio.homelab.local` -> ingress `.201`) to `bind9_extra_records` for the Remédio Certo API

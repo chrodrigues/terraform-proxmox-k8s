@@ -1,0 +1,7 @@
+---
+# Subnet router: lets every tailnet device reach the whole home LAN (apps, kube API, RDP).
+tailscale_hostname: homelab
+tailscale_advertise_routes: "{{ network_prefix }}.0/24"
+# Injected by the pipeline (never committed). Only needed the FIRST time the VM
+# joins the tailnet; once logged in, tailscaled keeps its own state on disk.
+tailscale_auth_key: ""

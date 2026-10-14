@@ -42,6 +42,21 @@ module "bind9_server" {
   vm_image_id     = module.proxmox.vm_image_id
 }
 
+# Tailscale subnet router: remote access to the whole LAN from outside home
+module "tailscale_router" {
+  source = "./modules/tailscale_router"
+
+  proxmox_node_name         = var.proxmox_node_name
+  proxmox_datastore_name    = var.proxmox_datastore_name
+  proxmox_vm_datastore_name = var.proxmox_vm_datastore_name
+  proxmox_vm_user           = var.proxmox_vm_user
+  ssh_public_key            = trimspace(data.local_file.ssh_public_key.content)
+
+  vm_ip           = var.tailscale_router_ip
+  network_gateway = var.network_gateway
+  vm_image_id     = module.proxmox.vm_image_id
+}
+
 # Ansible inventory and variables generated from the Terraform state,
 # so the VM list and IPs have a single source of truth.
 resource "local_file" "ansible_inventory" {
@@ -52,6 +67,7 @@ resource "local_file" "ansible_inventory" {
     vm_user             = var.proxmox_vm_user
     ssh_private_key     = abspath(pathexpand(var.ssh_private_key_file))
     dns_ip              = var.dns_server_ip
+    tailscale_ip        = var.tailscale_router_ip
     control_plane_nodes = local.control_plane_nodes
     worker_nodes        = local.worker_nodes
   })

@@ -9,6 +9,10 @@ all:
       hosts:
         bind9-dns-server:
           ansible_host: ${dns_ip}
+    vpn:
+      hosts:
+        tailscale-router:
+          ansible_host: ${tailscale_ip}
     k8s:
       children:
         control_plane:

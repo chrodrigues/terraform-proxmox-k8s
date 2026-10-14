@@ -3,6 +3,11 @@ output "dns_server_ip" {
   value       = var.dns_server_ip
 }
 
+output "tailscale_router_ip" {
+  description = "Tailscale subnet router IP"
+  value       = var.tailscale_router_ip
+}
+
 output "control_plane_nodes" {
   description = "Control plane nodes and their IPs"
   value       = local.control_plane_nodes
