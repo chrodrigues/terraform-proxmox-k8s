@@ -9,5 +9,6 @@ gitops_repo_branch: main
 gitops_repo_owner: chrodrigues
 # Secrets injected by the pipeline (never committed). Empty values skip the dependent steps.
 gitops_github_token: ""        # read access to the private homelab-gitops repo + commit statuses
-onepassword_sa_token: ""       # 1Password service account used by External Secrets
+onepassword_sa_token: ""         # personal 1Password service account (homelab vaults) used by External Secrets
+onepassword_company_sa_token: "" # company 1Password service account (Clara + DarkSense vaults)
 helm_version: "v3.19.0"

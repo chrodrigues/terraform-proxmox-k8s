@@ -50,6 +50,17 @@
   no_log: true
   changed_when: false
 
+- name: Company 1Password service-account token Secret
+  ansible.builtin.shell: >
+    set -o pipefail;
+    kubectl -n external-secrets create secret generic onepassword-company-token
+    --from-literal=token='{{ onepassword_company_sa_token }}' --dry-run=client -o yaml | kubectl apply -f -
+  args: {executable: /bin/bash}
+  environment: {KUBECONFIG: /etc/kubernetes/admin.conf}
+  when: onepassword_company_sa_token | length > 0
+  no_log: true
+  changed_when: false
+
 - name: Argo CD repository credential (private GitOps repo)
   ansible.builtin.shell: >
     set -o pipefail;
