@@ -20,6 +20,7 @@ bind9_extra_records:
   - {name: argocd, ip: "{{ network_prefix }}.202"}
   - {name: clara, ip: "{{ network_prefix }}.202"}
   - {name: remedio, ip: "{{ network_prefix }}.201"}
+  - {name: langfuse, ip: "{{ network_prefix }}.201"} # Langfuse (LLM tracing for Clara)
   - {name: grafana, ip: "{{ network_prefix }}.201"}
   - {name: prometheus, ip: "{{ network_prefix }}.201"}
   - {name: minio, ip: "{{ network_prefix }}.201"}    # MinIO console
