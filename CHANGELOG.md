@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- added the `clara-platform` A record (`clara-platform.homelab.local` -> shared ingress `.202`) for the new Clara platform, next to `clara`
 - renamed the Policy Reporter A record to `kyverno-reporter.homelab.local` (ingress `.201`); the `policy-reporter` name is gone
 - added the `policy-reporter` A record (`policy-reporter.homelab.local` -> ingress `.201`) for the Policy Reporter UI, the screen for the Kyverno findings of Clara's hardening
 - added the `langfuse` A record (`langfuse.homelab.local` -> ingress `.201`) for Langfuse, the LLM tracing for Clara
